@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>LAD Districts Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css" crossorigin="anonymous" />
+    <script src="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/protomaps-themes-base@2.0.0-alpha.5/dist/index.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script type="text/javascript">
+        const client = supabase.createClient(
+            'https://wyinqaovcwapplxrkqrv.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5aW5xYW92Y3dhcHBseHJrcXJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU4MjU5NDcsImV4cCI6MjA1MTQwMTk0N30.AnVFPkt4N_yZZW7_WbvTzsRVmYKsA1jwyiMwMw5_ycc'
+        )
+
+
+        function base64ToArrayBuffer(base64) {
+            var binaryString = atob(base64)
+            var bytes = new Uint8Array(binaryString.length)
+            for (var i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i)
+            }
+            return bytes
+        }
+
+        maplibregl.addProtocol('supabase', async (params, abortController) => {
+            const re = new RegExp(/supabase:\/\/(.+)\/(\d+)\/(\d+)\/(\d+)/)
+            const result = params.url.match(re)
+            const { data, error } = await client.rpc('mvt', {
+                z: result[2],
+                x: result[3],
+                y: result[4],
+            })
+            const encoded = base64ToArrayBuffer(data)
+            if (!error) {
+                return { data: encoded }
+            } else {
+                throw new Error(`Tile fetch error:`)
+            }
+        })
+
+        const map = new maplibregl.Map({
+            hash: true,
+            container: 'map',
+            style: {
+                version: 8,
+                glyphs: 'https://cdn.protomaps.com/fonts/pbf/{fontstack}/{range}.pbf',
+                sources: {
+                    supabase: {
+                        type: 'vector',
+                        tiles: ['supabase://boston/{z}/{x}/{y}'],
+                        attribution: '© <a href="https://overturemaps.org">Overture Maps Foundation</a>',
+                    },
+                    protomaps: {
+                        type: 'vector',
+                        url: 'https://api.protomaps.com/tiles/v3.json?key=your-protomaps-api-key',
+                        attribution: 'Basemap © <a href="https://openstreetmap.org">OpenStreetMap</a>',
+                    },
+                },
+            },
+        })
+
+
+        const popup = new maplibregl.Popup({
+            closeButton: true,
+            closeOnClick: false,
+            maxWidth: 'none'
+        });
+
+        map.on('click', 'district-fills', (e) => {
+            if (e.features.length > 0) {
+                const feature = e.features[0];
+                popup.setHTML(`
+                    <table style="font-size:12px">
+                        <tr><td>Name:</td><td>${feature.properties.lad21nm}</td></tr>
+                        <tr><td>Code:</td><td>${feature.properties.lad21cd}</td></tr>
+                        <tr><td>Area (ha):</td><td>${feature.properties.area_ha}</td></tr>
+                        <tr><td>GB Name:</td><td>${feature.properties.gb_name}</td></tr>
+                    </table>
+                `)
+                    .setLngLat(e.lngLat)
+                    .addTo(map);
+            }
+        });
+
+        map.on('mouseenter', 'district-fills', () => {
+            map.getCanvas().style.cursor = 'pointer';
+        });
+
+        map.on('mouseleave', 'district-fills', () => {
+            map.getCanvas().style.cursor = '';
+        });
+    </script>
+
+</body>
+
+</html>

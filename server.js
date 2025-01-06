@@ -4,6 +4,9 @@ const path = require("path");
 
 const app = express();
 
+// Serve static files (like test.html) from the current directory
+app.use(express.static(path.join(__dirname)));
+
 // Enable CORS and set correct mime type/content encoding
 const header = {
     "Access-Control-Allow-Origin": "*",
@@ -34,8 +37,8 @@ app.get('/:source/:z/:x/:y.pbf', (req, res) => {
     });
 });
 
-// Start server on port 3000
-const port = 3002;
+// Start server on port 3002
+const port = 3030;
 app.listen(port, () => {
-    console.log(`Server is listening on port: ${port}`);
+    console.log(`Server is listening on http://localhost:${port}`);
 });

@@ -1,113 +1,86 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-    <title>LAD Districts Map</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.css" crossorigin="anonymous" />
-    <script src="https://unpkg.com/maplibre-gl@4.1.2/dist/maplibre-gl.js" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/protomaps-themes-base@2.0.0-alpha.5/dist/index.js"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <title>Add an animated icon to the map</title>
+    <meta property="og:description"
+        content="Add an animated icon to the map that was generated at runtime with the Canvas API." />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@5.0.0/dist/maplibre-gl.js'></script>
     <style>
         body {
             margin: 0;
+            padding: 0;
         }
 
+        html,
+        body,
         #map {
-            height: 100vh;
-            width: 100vw;
+            height: 100%;
         }
     </style>
 </head>
 
 <body>
     <div id="map"></div>
-    <script type="text/javascript">
-        const client = supabase.createClient(
-            'https://wyinqaovcwapplxrkqrv.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind5aW5xYW92Y3dhcHBseHJrcXJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU4MjU5NDcsImV4cCI6MjA1MTQwMTk0N30.AnVFPkt4N_yZZW7_WbvTzsRVmYKsA1jwyiMwMw5_ycc'
-        )
 
-
-        function base64ToArrayBuffer(base64) {
-            var binaryString = atob(base64)
-            var bytes = new Uint8Array(binaryString.length)
-            for (var i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i)
-            }
-            return bytes
-        }
-
-        maplibregl.addProtocol('supabase', async (params, abortController) => {
-            const re = new RegExp(/supabase:\/\/(.+)\/(\d+)\/(\d+)\/(\d+)/)
-            const result = params.url.match(re)
-            const { data, error } = await client.rpc('mvt', {
-                z: result[2],
-                x: result[3],
-                y: result[4],
-            })
-            const encoded = base64ToArrayBuffer(data)
-            if (!error) {
-                return { data: encoded }
-            } else {
-                throw new Error(`Tile fetch error:`)
-            }
-        })
-
-        const map = new maplibregl.Map({
-            hash: true,
-            container: 'map',
-            style: {
-                version: 8,
-                glyphs: 'https://cdn.protomaps.com/fonts/pbf/{fontstack}/{range}.pbf',
-                sources: {
-                    supabase: {
-                        type: 'vector',
-                        tiles: ['supabase://boston/{z}/{x}/{y}'],
-                        attribution: '© <a href="https://overturemaps.org">Overture Maps Foundation</a>',
-                    },
-                    protomaps: {
-                        type: 'vector',
-                        url: 'https://api.protomaps.com/tiles/v3.json?key=your-protomaps-api-key',
-                        attribution: 'Basemap © <a href="https://openstreetmap.org">OpenStreetMap</a>',
-                    },
-                },
+    <script>
+        // Define the map syle (OpenStreetMap raster tiles)
+        const style = {
+            "version": 8,
+            "sources": {
+                "osm": {
+                    "type": "raster",
+                    "tiles": ["https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                    "tileSize": 256,
+                    "attribution": "&copy; OpenStreetMap Contributors",
+                    "maxzoom": 19
+                }
             },
-        })
+            "layers": [
+                {
+                    "id": "osm",
+                    "type": "raster",
+                    "source": "osm" // This must match the source key above
+                }
+            ]
+        };
 
-
-        const popup = new maplibregl.Popup({
-            closeButton: true,
-            closeOnClick: false,
-            maxWidth: 'none'
+        // Initialise the map
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: style,
+            center: [1, 15],
+            zoom: 3
         });
 
-        map.on('click', 'district-fills', (e) => {
-            if (e.features.length > 0) {
-                const feature = e.features[0];
-                popup.setHTML(`
-                    <table style="font-size:12px">
-                        <tr><td>Name:</td><td>${feature.properties.lad21nm}</td></tr>
-                        <tr><td>Code:</td><td>${feature.properties.lad21cd}</td></tr>
-                        <tr><td>Area (ha):</td><td>${feature.properties.area_ha}</td></tr>
-                        <tr><td>GB Name:</td><td>${feature.properties.gb_name}</td></tr>
-                    </table>
-                `)
-                    .setLngLat(e.lngLat)
-                    .addTo(map);
-            }
-        });
+        // Add the navigation control
+        map.addControl(new maplibregl.NavigationControl());
 
-        map.on('mouseenter', 'district-fills', () => {
-            map.getCanvas().style.cursor = 'pointer';
-        });
+        map.on('load', () => {
+            // Add the MBTiles source
+            map.addSource('greenbelt', {
+                type: 'vector',
+                tiles: ['http://localhost:3002/tiles-directory/{z}/{x}/{y}.pbf'],
+                minzoom: 0,
+                maxzoom: 10
+            });
 
-        map.on('mouseleave', 'district-fills', () => {
-            map.getCanvas().style.cursor = '';
+            // Add the layer
+            map.addLayer({
+                id: 'greenbelt-layer',
+                type: 'fill',
+                source: 'greenbelt',
+                'source-layer': 'layer_name',  // Use the same layer name used in Tippecanoe
+                paint: {
+                    'fill-color': '#2ecc71',
+                    'fill-opacity': 0.5
+                }
+            });
         });
     </script>
-
 </body>
 
 </html>
